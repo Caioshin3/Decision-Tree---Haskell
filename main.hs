@@ -1,7 +1,13 @@
--- Aqui só definimos o tipo de dado da árvore
+{-# LANGUAGE OverloadedStrings #-}
+import qualified Data.Tree as T
+import Data.Tree (drawTree)
+import Data.Char (toUpper)
+import Data.List (isPrefixOf, dropWhileEnd)
+
+-- Definição da árvore binária
 data BinTree a = Leaf a | Node a (BinTree a) (BinTree a)
 
--- Árvore de decisão para definir o que é nó de cada qual
+-- Árvore de decisão
 decisionTree :: BinTree String
 decisionTree = 
     Node "Fez Poscomp?" 
@@ -28,26 +34,51 @@ decisionTree =
                 (Leaf "Eliminado"))
             (Leaf "Eliminado"))
 
--- Aqui vamos navegar pela árvore baseado na decisão
+-- Converte nossa árvore para uma árvore do módulo Data.Tree, 
+-- incluindo os parênteses para representar cada nó
+toDataTree :: BinTree String -> T.Tree String
+toDataTree (Leaf s)      = T.Node ("(" ++ s ++ ")") []
+toDataTree (Node s l r)  = T.Node ("(" ++ s ++ ")") [toDataTree l, toDataTree r]
+
+-- Funções de normalização de entrada
+trim :: String -> String
+trim = dropWhileEnd (==' ') . dropWhile (==' ')
+
+normalize :: String -> String
+normalize = map toUpper . trim
+
+isYes :: String -> Bool
+isYes ans = any (`isPrefixOf` ansNorm) ["SIM", "S", "Y", "YES"]
+  where ansNorm = normalize ans
+
+isNo :: String -> Bool
+isNo ans = any (`isPrefixOf` ansNorm) ["NÃO", "NAO", "N", "NO"]
+  where ansNorm = normalize ans
+
+-- Função que navega pela árvore interativamente e mostra o desenho atual
 askQuestion :: BinTree String -> IO String
-askQuestion (Leaf result) = return result
-askQuestion (Node question left right) = do
-    putStrLn question
-    answer <- getLine
-    if answer == "SIM" then askQuestion left
-    else if answer == "NÃO" then askQuestion right
-    else do
-        putStrLn "Entrada inválida! Responda com SIM ou NÃO."
-        askQuestion (Node question left right)
+askQuestion tree = do
+    putStrLn "\n--- Árvore atual ---"
+    -- Exibe o desenho da árvore usando Data.Tree.drawTree
+    putStrLn $ drawTree (toDataTree tree)
+    case tree of
+        Leaf result -> return result
+        Node question left right -> do
+            putStrLn question
+            answer <- getLine
+            if isYes answer then askQuestion left
+            else if isNo answer then askQuestion right
+            else do
+                putStrLn "Entrada inválida! Responda com uma variação de SIM ou NÃO."
+                askQuestion tree
 
 -- Função principal para executar o programa interativo
 main :: IO ()
 main = do
     result <- askQuestion decisionTree
     putStrLn $ "Resultado: " ++ result
-    -- Aqui vai continuar pra sempre enquanto não digitar sair
-    putStrLn "Digite 'sair' para terminar ou pressione Enter para continuar."
+    putStrLn "Digite 'sair' para terminar ou pressione Enter para reiniciar."
     continue <- getLine
-    if continue /= "sair"
+    if normalize continue /= "SAIR"
         then main
         else putStrLn "Programa encerrado."
